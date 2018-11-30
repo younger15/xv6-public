@@ -23,6 +23,11 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int cps(void);
+int userTag(char*);
+int changeUser(char*);
+int getUser(void);
+int changeOwner(char*, char*);
 
 // ulib.c
 int stat(const char*, struct stat*);

@@ -38,7 +38,7 @@ void wsect(uint, void*);
 void winode(uint, struct dinode*);
 void rinode(uint inum, struct dinode *ip);
 void rsect(uint sec, void *buf);
-uint ialloc(ushort type);
+uint ialloc(ushort type, char* fname);
 void iappend(uint inum, void *p, int n);
 
 // convert to intel byte order
@@ -80,10 +80,9 @@ main(int argc, char *argv[])
     fprintf(stderr, "Usage: mkfs fs.img files...\n");
     exit(1);
   }
-
+  //fprintf(stderr, "%d\n", BSIZE % sizeof(struct dinode));
   assert((BSIZE % sizeof(struct dinode)) == 0);
-  assert((BSIZE % sizeof(struct dirent)) == 0);
-
+  //printf("\n\n\narg1: %s\n\n\n", argv[1]);
   fsfd = open(argv[1], O_RDWR|O_CREAT|O_TRUNC, 0666);
   if(fsfd < 0){
     perror(argv[1]);
@@ -114,7 +113,7 @@ main(int argc, char *argv[])
   memmove(buf, &sb, sizeof(sb));
   wsect(1, buf);
 
-  rootino = ialloc(T_DIR);
+  rootino = ialloc(T_DIR, "Admin");
   assert(rootino == ROOTINO);
 
   bzero(&de, sizeof(de));
@@ -129,7 +128,7 @@ main(int argc, char *argv[])
 
   for(i = 2; i < argc; i++){
     assert(index(argv[i], '/') == 0);
-
+    //printf("\n\nfiles %s\n", argv[i]);
     if((fd = open(argv[i], 0)) < 0){
       perror(argv[i]);
       exit(1);
@@ -142,16 +141,17 @@ main(int argc, char *argv[])
     if(argv[i][0] == '_')
       ++argv[i];
 
-    inum = ialloc(T_FILE);
+    inum = ialloc(T_FILE, argv[i]);
 
     bzero(&de, sizeof(de));
     de.inum = xshort(inum);
     strncpy(de.name, argv[i], DIRSIZ);
     iappend(rootino, &de, sizeof(de));
 
-    while((cc = read(fd, buf, sizeof(buf))) > 0)
-      iappend(inum, buf, cc);
-
+    while((cc = read(fd, buf, sizeof(buf))) > 0){
+	//printf("cc: %s\n\n",buf);	    
+	iappend(inum, buf, cc);
+    }
     close(fd);
   }
 
@@ -221,7 +221,7 @@ rsect(uint sec, void *buf)
 }
 
 uint
-ialloc(ushort type)
+ialloc(ushort type, char *fname)
 {
   uint inum = freeinode++;
   struct dinode din;
@@ -230,6 +230,90 @@ ialloc(ushort type)
   din.type = xshort(type);
   din.nlink = xshort(1);
   din.size = xint(0);
+  if(strcmp(fname,"Admin") != 0)
+{
+	
+
+  int fd = open("FileAppendix", O_RDONLY);
+  if(fd >= 0)
+  {
+	char buf[512];
+	read(fd, buf, sizeof(buf));
+	char c;	
+	char namebuf[96];
+	char ownerbuf[96];
+	char groupbuf[96];
+	int i = 0; // buffer iterator
+	int j = 0; // name buffer iterator
+	do
+	{
+		c = buf[i];
+		i++;
+		if (c == '\0')
+			break;
+		if (c==':') // read the end of a name
+		{
+			// compare current name with fname
+			char* p = namebuf; // namebuf iterator
+			char* q = fname; // fname iterator
+			while(j > 0 && *q && *p == *q)
+			{
+				p++;
+				q++;
+				j--;
+			}			
+			if(j==0) // fname is found in FileAppendix
+			{
+				// assign owner to owner
+				j = 0;
+				do
+				{
+					c = buf[i];
+					i++;
+					ownerbuf[j] = c;
+					j++;
+				} while (c != ':');
+				ownerbuf[j-1] = '\0';
+				j = 0;
+				do
+				{
+					c = buf[i];
+					i++;
+					groupbuf[j] = c;
+					j++;
+				} while (c != ':');
+				groupbuf[j-1] = '\0';
+				//printf("owner: %s, group: %s\n",ownerbuf,groupbuf);
+				strcpy(din.owner, ownerbuf);
+				strcpy(din.group, groupbuf);
+			}			
+			else	// this is not fname
+			{
+				// skip two semi-colons (the name & group)
+				do
+				{		
+					c = buf[i];
+					i++;
+				} while (c != ':');
+				do
+				{
+					c = buf[i];
+					i++;
+				} while (c != ':');
+				
+			}
+			j = 0;
+		}
+		else
+		{
+			namebuf[j] = c;	
+			j++;	
+		}		
+	} while(c!='\0');
+	// file name not found in FileAppendix
+	}
+	close(fd);
+  } 
   winode(inum, &din);
   return inum;
 }

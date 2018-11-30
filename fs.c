@@ -213,11 +213,50 @@ ialloc(uint dev, short type)
   }
   panic("ialloc: no inodes");
 }
+/*struct inode*
+ialloc(uint dev, short type, char* userName)
+{
+  int inum;
+  struct buf *bp;
+  struct dinode *dip;
+
+  for(inum = 1; inum < sb.ninodes; inum++){
+    bp = bread(dev, IBLOCK(inum, sb));
+    dip = (struct dinode*)bp->data + inum%IPB;
+    if(dip->type == 0){  // a free inode
+      memset(dip, 0, sizeof(*dip));
+      dip->type = type;
+      dip->userProp.name = userName;
+      log_write(bp);   // mark it allocated on the disk
+      brelse(bp);
+      return iget(dev, inum);
+    }
+    brelse(bp);
+  }
+  panic("ialloc: no inodes");
+}*/
 
 // Copy a modified in-memory inode to disk.
 // Must be called after every change to an ip->xxx field
 // that lives on disk, since i-node cache is write-through.
 // Caller must hold ip->lock.
+/*void
+iupdate(struct inode *ip)
+{
+  struct buf *bp;
+  struct dinode *dip;
+
+  bp = bread(ip->dev, IBLOCK(ip->inum, sb));
+  dip = (struct dinode*)bp->data + ip->inum%IPB;
+  dip->type = ip->type;
+  dip->major = ip->major;
+  dip->minor = ip->minor;
+  dip->nlink = ip->nlink;
+  dip->size = ip->size;
+  memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
+  log_write(bp);
+  brelse(bp);
+}*/
 void
 iupdate(struct inode *ip)
 {
@@ -229,6 +268,8 @@ iupdate(struct inode *ip)
   dip->type = ip->type;
   dip->major = ip->major;
   dip->minor = ip->minor;
+  safestrcpy(dip->owner, ip->uProp.name, sizeof(ip->uProp.name));
+  safestrcpy(dip->group, ip->uProp.group, sizeof(ip->uProp.group));
   dip->nlink = ip->nlink;
   dip->size = ip->size;
   memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
@@ -277,7 +318,9 @@ iget(uint dev, uint inum)
 struct inode*
 idup(struct inode *ip)
 {
+  //cprintf("dev: %d\ninum:: %d\n",ip->dev,ip->inum);
   acquire(&icache.lock);
+  //
   ip->ref++;
   release(&icache.lock);
   return ip;
@@ -285,6 +328,32 @@ idup(struct inode *ip)
 
 // Lock the given inode.
 // Reads the inode from disk if necessary.
+/*void
+ilock(struct inode *ip)
+{
+  struct buf *bp;
+  struct dinode *dip;
+
+  if(ip == 0 || ip->ref < 1)
+    panic("ilock");
+
+  acquiresleep(&ip->lock);
+
+  if(ip->valid == 0){
+    bp = bread(ip->dev, IBLOCK(ip->inum, sb));
+    dip = (struct dinode*)bp->data + ip->inum%IPB;
+    ip->type = dip->type;
+    ip->major = dip->major;
+    ip->minor = dip->minor;
+    ip->nlink = dip->nlink;
+    ip->size = dip->size;
+    memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
+    brelse(bp);
+    ip->valid = 1;
+    if(ip->type == 0)
+      panic("ilock: no type");
+  }
+}*/
 void
 ilock(struct inode *ip)
 {
@@ -301,6 +370,8 @@ ilock(struct inode *ip)
     dip = (struct dinode*)bp->data + ip->inum%IPB;
     ip->type = dip->type;
     ip->major = dip->major;
+    safestrcpy(ip->uProp.name, dip->owner, sizeof(dip->owner) + 1);
+    safestrcpy(ip->uProp.group, dip->group, sizeof(dip->group) + 1);
     ip->minor = dip->minor;
     ip->nlink = dip->nlink;
     ip->size = dip->size;
@@ -332,6 +403,7 @@ iunlock(struct inode *ip)
 void
 iput(struct inode *ip)
 {
+  //cprintf("iput nlink: %d\n",ip->nlink);
   acquiresleep(&ip->lock);
   if(ip->valid && ip->nlink == 0){
     acquire(&icache.lock);
@@ -339,6 +411,7 @@ iput(struct inode *ip)
     release(&icache.lock);
     if(r == 1){
       // inode has no links and no other references: truncate and free.
+      //cprintf("iput owner: %s\n",ip->uProp.name);
       itrunc(ip);
       ip->type = 0;
       iupdate(ip);
@@ -437,6 +510,15 @@ itrunc(struct inode *ip)
 
 // Copy stat information from inode.
 // Caller must hold ip->lock.
+/*void
+stati(struct inode *ip, struct stat *st)
+{
+  st->dev = ip->dev;
+  st->ino = ip->inum;
+  st->type = ip->type;
+  st->nlink = ip->nlink;
+  st->size = ip->size;
+}*/
 void
 stati(struct inode *ip, struct stat *st)
 {
@@ -445,6 +527,9 @@ stati(struct inode *ip, struct stat *st)
   st->type = ip->type;
   st->nlink = ip->nlink;
   st->size = ip->size;
+  //st->userProp = ip->userProp;
+  safestrcpy(st->owner, ip->uProp.name, strlen(ip->uProp.name) + 1);
+  safestrcpy(st->group, ip->uProp.group, strlen(ip->uProp.group) + 1);
 }
 
 //PAGEBREAK!
@@ -457,6 +542,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   struct buf *bp;
 
   if(ip->type == T_DEV){
+	//cprintf("T_DEV\n");
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].read)
       return -1;
     return devsw[ip->major].read(ip, dst, n);
@@ -475,6 +561,35 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   }
   return n;
 }
+/*int
+readi(struct inode *ip, char *dst, uint off, uint n, struct userProp *user)
+{
+  if(user->name == "" || user->name == null || user->name == ip->userProp->name)
+  {
+  	uint tot, m;
+  	struct buf *bp;
+
+  	if(ip->type == T_DEV){
+    		if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].read)
+      			return -1;
+    		return devsw[ip->major].read(ip, dst, n);
+  	}
+
+  	if(off > ip->size || off + n < off)
+    		return -1;
+  	if(off + n > ip->size)
+    		n = ip->size - off;
+
+  	for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
+    		bp = bread(ip->dev, bmap(ip, off/BSIZE));
+    		m = min(n - tot, BSIZE - off%BSIZE);
+    		memmove(dst, bp->data + off%BSIZE, m);
+    		brelse(bp);
+  	}
+  	return n;
+  }
+  return -1;
+}*/
 
 // PAGEBREAK!
 // Write data to inode.
@@ -484,7 +599,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
 {
   uint tot, m;
   struct buf *bp;
-
+  //cprintf("src: %s\n", src);
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
       return -1;
@@ -503,13 +618,48 @@ writei(struct inode *ip, char *src, uint off, uint n)
     log_write(bp);
     brelse(bp);
   }
-
+  //cprintf("fs.c writei() storing file\n");
   if(n > 0 && off > ip->size){
     ip->size = off;
     iupdate(ip);
   }
   return n;
 }
+/*int
+writei(struct inode *ip, char *src, uint off, uint n, struct userProp *user)
+{
+  if(user->name == "" || user->name == null || user->name == ip->userProp->name)
+  {
+  	uint tot, m;
+  	struct buf *bp;
+
+  	if(ip->type == T_DEV){
+    		if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
+      			return -1;
+    		return devsw[ip->major].write(ip, src, n);
+  	}
+
+  	if(off > ip->size || off + n < off)
+    		return -1;
+  	if(off + n > MAXFILE*BSIZE)
+    		return -1;
+
+  	for(tot=0; tot<n; tot+=m, off+=m, src+=m){
+    		bp = bread(ip->dev, bmap(ip, off/BSIZE));
+    		m = min(n - tot, BSIZE - off%BSIZE);
+    		memmove(bp->data + off%BSIZE, src, m);
+    		log_write(bp);
+    		brelse(bp);
+  	}
+
+  	if(n > 0 && off > ip->size){
+    		ip->size = off;
+    		iupdate(ip);
+  	}
+  	return n;
+  }
+  return -1;
+}*/
 
 //PAGEBREAK!
 // Directories
@@ -528,12 +678,17 @@ dirlookup(struct inode *dp, char *name, uint *poff)
   uint off, inum;
   struct dirent de;
 
-  if(dp->type != T_DIR)
-    panic("dirlookup not DIR");
-
+  if(dp->type != T_DIR){
+	//cprintf("dp type: %d\n", dp->type);    
+	panic("dirlookup not DIR");
+    
+  }
+  //cprintf("dp size: %d\n", dp->size); 
   for(off = 0; off < dp->size; off += sizeof(de)){
-    if(readi(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
-      panic("dirlookup read");
+    if(readi(dp, (char*)&de, off, sizeof(de)) != sizeof(de)){
+		//cprintf("sizeof de: %d\n",sizeof(de));	
+		panic("dirlookup read");
+	}
     if(de.inum == 0)
       continue;
     if(namecmp(name, de.name) == 0){
@@ -544,7 +699,7 @@ dirlookup(struct inode *dp, char *name, uint *poff)
       return iget(dp->dev, inum);
     }
   }
-
+  //cprintf("de name: %s\n", de.name);
   return 0;
 }
 
@@ -626,24 +781,31 @@ static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
   struct inode *ip, *next;
-
-  if(*path == '/')
+  //cprintf("before dev: %d\ninum:: %d\n",ip->dev,ip->inum);
+  if(*path == '/'){
     ip = iget(ROOTDEV, ROOTINO);
+  	//cprintf("get from device1\n");
+  }
   else
     ip = idup(myproc()->cwd);
-
+  //cprintf("dev: %d\ninum:: %d\n",ip->dev,ip->inum);
   while((path = skipelem(path, name)) != 0){
+//cprintf("path: %s\n", path);
     ilock(ip);
     if(ip->type != T_DIR){
+	//cprintf("testing\n");
       iunlockput(ip);
       return 0;
     }
     if(nameiparent && *path == '\0'){
       // Stop one level early.
+	//cprintf("testing1\n");
       iunlock(ip);
       return ip;
     }
+	//cprintf("name:  %s\n", name);
     if((next = dirlookup(ip, name, 0)) == 0){
+	//cprintf("testing2\n");
       iunlockput(ip);
       return 0;
     }
@@ -651,6 +813,7 @@ namex(char *path, int nameiparent, char *name)
     ip = next;
   }
   if(nameiparent){
+	//cprintf("testing3\n");
     iput(ip);
     return 0;
   }

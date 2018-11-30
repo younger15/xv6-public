@@ -1,0 +1,24 @@
+makefile
+usys.S
+sysproc.c
+syscall.h
+defs.h
+proc.c
+user.h
+syscall.c
+customUser.c
+customUser.h
+fs.h
+fs.c
+file.h
+file.c
+mkfs.c
+sysfile.c
+
+add:
+	ps.c
+	co.c
+	cu.c
+	au.c
+	lu.c
+	du.c

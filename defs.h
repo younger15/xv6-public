@@ -9,6 +9,8 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct userProp;
+//char currentUser[128];
 
 // bio.c
 void            binit(void);
@@ -27,12 +29,16 @@ int             exec(char*, char**);
 
 // file.c
 struct file*    filealloc(void);
+//struct file*	filealloc(struct userProp*);
+//struct file*	filealloc(char *owner);
 void            fileclose(struct file*);
 struct file*    filedup(struct file*);
 void            fileinit(void);
 int             fileread(struct file*, char*, int n);
+//int             fileread(struct file*, char*, int n, struct userProp*);
 int             filestat(struct file*, struct stat*);
 int             filewrite(struct file*, char*, int n);
+//int             filewrite(struct file*, char*, int n, struct userProp*);
 
 // fs.c
 void            readsb(int dev, struct superblock *sb);
@@ -120,6 +126,11 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+int 		cps(void);
+int		changeUser(char*);//login name
+int		getUser(void);//get current user
+
+
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -186,5 +197,7 @@ void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
 
+// customUser.c
+void		initUser();
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

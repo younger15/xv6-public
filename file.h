@@ -1,4 +1,16 @@
-struct file {
+//#include"customUser.h"
+
+struct userGroup{
+	char groupName[96];
+	struct userGroup *nextOne;
+};
+struct userProp{
+	char name[96];
+	//struct userGroup *group;
+	char group[96];
+};
+
+/*struct file {
   enum { FD_NONE, FD_PIPE, FD_INODE } type;
   int ref; // reference count
   char readable;
@@ -6,10 +18,36 @@ struct file {
   struct pipe *pipe;
   struct inode *ip;
   uint off;
+};*/
+
+struct file {
+  enum { FD_NONE, FD_PIPE, FD_INODE } type;
+  int ref; // reference count
+  char readable;
+  char writable;
+  struct pipe *pipe;
+  struct inode *ip;
+  struct userProp uProp;
+  uint off;
+  char name[32];
 };
 
 
 // in-memory copy of an inode
+/*struct inode {
+  uint dev;           // Device number
+  uint inum;          // Inode number
+  int ref;            // Reference count
+  struct sleeplock lock; // protects everything below here
+  int valid;          // inode has been read from disk?
+
+  short type;         // copy of disk inode
+  short major;
+  short minor;
+  short nlink;
+  uint size;
+  uint addrs[NDIRECT+1];
+};*/
 struct inode {
   uint dev;           // Device number
   uint inum;          // Inode number
@@ -19,6 +57,7 @@ struct inode {
 
   short type;         // copy of disk inode
   short major;
+  struct userProp uProp;    // user and group prop
   short minor;
   short nlink;
   uint size;

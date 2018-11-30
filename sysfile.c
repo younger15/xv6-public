@@ -76,6 +76,7 @@ sys_read(void)
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
     return -1;
   return fileread(f, p, n);
+  //return fileread(f, p, n, 0);
 }
 
 int
@@ -88,6 +89,7 @@ sys_write(void)
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
     return -1;
   return filewrite(f, p, n);
+  //return filewrite(f, p, n, 0);
 }
 
 int
@@ -238,6 +240,51 @@ bad:
   return -1;
 }
 
+/*static struct inode*
+create(char *path, short type, short major, short minor)
+{
+  uint off;
+  struct inode *ip, *dp;
+  char name[DIRSIZ];
+
+  if((dp = nameiparent(path, name)) == 0)
+    return 0;
+  ilock(dp);
+
+  if((ip = dirlookup(dp, name, &off)) != 0){
+    iunlockput(dp);
+    ilock(ip);
+    if(type == T_FILE && ip->type == T_FILE)
+      return ip;
+    iunlockput(ip);
+    return 0;
+  }
+
+  if((ip = ialloc(dp->dev, type)) == 0)
+    panic("create: ialloc");
+
+  ilock(ip);
+  ip->major = major;
+  ip->minor = minor;
+  ip->nlink = 1;
+  iupdate(ip);
+
+  if(type == T_DIR){  // Create . and .. entries.
+    dp->nlink++;  // for ".."
+    iupdate(dp);
+    // No ip->nlink++ for ".": avoid cyclic ref count.
+    if(dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
+      panic("create dots");
+  }
+
+  if(dirlink(dp, name, ip->inum) < 0)
+    panic("create: dirlink");
+
+  iunlockput(dp);
+
+  return ip;
+}*/
+
 static struct inode*
 create(char *path, short type, short major, short minor)
 {
@@ -283,7 +330,7 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
-int
+/*int
 sys_open(void)
 {
   char *path;
@@ -292,11 +339,15 @@ sys_open(void)
   struct inode *ip;
 
   if(argstr(0, &path) < 0 || argint(1, &omode) < 0)
-    return -1;
-
+    {
+	//cprintf("path: %s\n", path);
+	//cprintf("mode: %s\n", omode);
+	return -1;
+    }
   begin_op();
 
   if(omode & O_CREATE){
+	//cprintf("createFile\n");
     ip = create(path, T_FILE, 0, 0);
     if(ip == 0){
       end_op();
@@ -304,6 +355,7 @@ sys_open(void)
     }
   } else {
     if((ip = namei(path)) == 0){
+	//cprintf("wrong path: %s\n", path);
       end_op();
       return -1;
     }
@@ -316,6 +368,7 @@ sys_open(void)
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+  //if((f = filealloc(myproc()->currentUser)) == 0 || (fd = fdalloc(f)) < 0){
     if(f)
       fileclose(f);
     iunlockput(ip);
@@ -323,13 +376,89 @@ sys_open(void)
     return -1;
   }
   iunlock(ip);
-  end_op();
+  end_op();  
 
   f->type = FD_INODE;
   f->ip = ip;
   f->off = 0;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+  return fd;
+}*/
+
+int
+sys_open(void)
+{
+  char *path;
+  int fd, omode;
+  struct file *f;
+  struct inode *ip;
+
+  if(argstr(0, &path) < 0 || argint(1, &omode) < 0)
+    {
+	//cprintf("path: %s\n", path);
+	//cprintf("mode: %s\n", omode);
+	return -1;
+    }
+  begin_op();
+  //cprintf("open with user: %s\n", myproc()->currentUser);
+  char *temp;
+  argstr(0, &temp);
+  if(omode & O_CREATE){
+	//cprintf("\n\ncreateFile\n\n");
+    ip = create(path, T_FILE, 0, 0);
+    safestrcpy(ip->uProp.name, myproc()->currentUser, strlen(myproc()->currentUser) + 1);
+    if(ip == 0){
+      end_op();
+      return -1;
+    }
+  } else {
+    if((ip = namei(path)) == 0){
+	//cprintf("wrong path: %s\n", path);
+      end_op();
+      return -1;
+    }
+    ilock(ip);
+    if(ip->type == T_DIR && omode != O_RDONLY){
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+  }
+  if(strncmp(ip->uProp.name, "", strlen(ip->uProp.name) + 1) != 0)
+  {
+	if(strncmp(myproc()->currentUser, "Admin", strlen(myproc()->currentUser) + 1) != 0)
+	{
+		if(strncmp(myproc()->currentUser, ip->uProp.name, strlen(myproc()->currentUser) + 1) != 0)
+		{
+			cprintf("File access denied\n");
+
+			iunlockput(ip);
+      			end_op();
+			return -1;
+		}
+	}
+  }
+  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+  //if((f = filealloc(myproc()->currentUser)) == 0 || (fd = fdalloc(f)) < 0){
+    if(f)
+      fileclose(f);
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  iunlock(ip);
+  end_op();  
+  
+  
+  safestrcpy(f->name, temp, strlen(temp) + 1);
+  f->type = FD_INODE;
+  f->ip = ip;
+  f->off = 0;
+  f->readable = !(omode & O_WRONLY);
+  f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+  //safestrcpy(f->uProp.name, myproc()->currentUser, strlen(myproc()->currentUser) + 1);
+  //cprintf("IP owner: %s\n", ip->uProp.name);
   return fd;
 }
 
@@ -443,3 +572,103 @@ sys_pipe(void)
   fd[1] = fd1;
   return 0;
 }
+int
+sys_changeOwner(void)
+{
+	char *fname;
+	char *owner;
+	struct inode *ip;
+	argstr(0, &fname);
+	argstr(1, &owner);
+	//cprintf("%s %s\n",fname,owner);
+	if(argstr(0, &fname) < 0)
+        {
+		return -1;
+        }
+	begin_op();
+	if((ip = namei(fname)) == 0){
+		//cprintf("wrong path: %s\n", path);
+      		end_op();
+      		return -1;
+    	}
+    	ilock(ip);
+    	if(ip->type == T_DIR){
+      		iunlockput(ip);
+      		end_op();
+      		return -1;
+    	}
+  	if(strncmp(ip->uProp.name, "", strlen(ip->uProp.name) + 1) != 0)
+  	{
+		if(strncmp(myproc()->currentUser, "Admin", strlen(myproc()->currentUser) + 1) != 0)
+		{
+			if(strncmp(myproc()->currentUser, ip->uProp.name, strlen(myproc()->currentUser) + 1) != 0)
+			{
+				cprintf("Owner: %s\nOwner change denied\n", ip->uProp.name);
+
+				iunlockput(ip);
+      				end_op();
+				return -1;
+			}
+		}
+  	}
+	safestrcpy(ip->uProp.name, owner, strlen(owner) + 1);
+	iupdate(ip);
+	iunlockput(ip);
+      	end_op();
+	return 0;
+}
+int
+sys_userTag(void)
+{
+	char *fname;
+	struct inode *ip;
+	argstr(0, &fname);
+	cprintf("file name: %s\n",fname);
+	if(argstr(0, &fname) < 0)
+        {
+		return -1;
+        }
+	begin_op();
+	if((ip = namei(fname)) == 0){
+		//cprintf("wrong path: %s\n", path);
+      		end_op();
+      		return -1;
+    	}
+    	ilock(ip);
+    	if(ip->type == T_DIR){
+      		iunlockput(ip);
+      		end_op();
+      		return -1;
+    	}
+  	
+	cprintf("%s: %s\n", fname, ip->uProp.name);
+	iunlock(ip);
+      	end_op();
+	return 0;
+}
+/*
+int
+sys_listUser(void)
+{
+	char* userName;
+	argstr(0, &userName);
+	if(argstr(0,&userName)<0)
+	{
+		return -1;
+	}
+	return 0;
+}
+
+int
+sys_addUser(void)
+{
+	return 0;
+}
+int
+sys_deleteUser(void)
+{
+	return 0;
+}
+
+*/
+
