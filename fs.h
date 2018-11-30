@@ -1,9 +1,12 @@
+//#include"customUser.h"
+
 // On-disk file system format.
 // Both the kernel and user programs use this header file.
 
 
 #define ROOTINO 1  // root i-number
 #define BSIZE 512  // block size
+//#define BSIZE 768
 
 // Disk layout:
 // [ boot block | super block | log | inode blocks |
@@ -33,7 +36,20 @@ struct dinode {
   short nlink;          // Number of links to inode in file system
   uint size;            // Size of file (bytes)
   uint addrs[NDIRECT+1];   // Data block addresses
+  //struct userProp uProp;
+  char owner[96];
+  char group[96];
 };
+/*struct dinode {
+  short type;           // File type
+  short major;          // Major device number (T_DEV only)
+  short minor;          // Minor device number (T_DEV only)
+  short nlink;          // Number of links to inode in file system
+  struct userProp;	// add user prop
+  uint size;            // Size of file (bytes)
+  uint addrs[NDIRECT+1];   // Data block addresses
+};*/
+
 
 // Inodes per block.
 #define IPB           (BSIZE / sizeof(struct dinode))

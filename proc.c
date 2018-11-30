@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+//#include "fcntl.h"
 
 struct {
   struct spinlock lock;
@@ -117,6 +118,41 @@ found:
 
 //PAGEBREAK: 32
 // Set up first user process.
+/*void
+userinit(void)
+{
+  struct proc *p;
+  extern char _binary_initcode_start[], _binary_initcode_size[];
+
+  p = allocproc();
+  
+  initproc = p;
+  if((p->pgdir = setupkvm()) == 0)
+    panic("userinit: out of memory?");
+  inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
+  p->sz = PGSIZE;
+  memset(p->tf, 0, sizeof(*p->tf));
+  p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
+  p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
+  p->tf->es = p->tf->ds;
+  p->tf->ss = p->tf->ds;
+  p->tf->eflags = FL_IF;
+  p->tf->esp = PGSIZE;
+  p->tf->eip = 0;  // beginning of initcode.S
+
+  safestrcpy(p->name, "initcode", sizeof(p->name));
+  p->cwd = namei("/");
+
+  // this assignment to p->state lets other cores
+  // run this process. the acquire forces the above
+  // writes to be visible, and the lock is also needed
+  // because the assignment might not be atomic.
+  acquire(&ptable.lock);
+
+  p->state = RUNNABLE;
+  
+  release(&ptable.lock);
+}*/
 void
 userinit(void)
 {
@@ -149,7 +185,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
-
+  safestrcpy(p->currentUser, "Admin", 6);
   release(&ptable.lock);
 }
 
@@ -199,6 +235,7 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
+  safestrcpy(np->currentUser, curproc->currentUser, strlen(curproc->currentUser) + 1);
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -532,3 +569,103 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+//process state
+int
+cps()
+{
+struct proc *p;
+
+	//Enable interrupt on this processor
+	sti();
+	acquire(&ptable.lock);
+	cprintf("name \t pid \t state \t \n");
+	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+	{
+		if(p->state == SLEEPING)
+		{
+			cprintf("%s \t %d \t SLEEPING \t \n", p->name, p->pid);
+		}
+		else if(p->state == RUNNING)
+		{
+			cprintf("%s \t %d \t RUNNING \t \n", p->name, p->pid);
+		}
+		else if(p->state == RUNNABLE)
+		{
+			cprintf("%s \t %d \t RUNNABLE \t \n", p->name, p->pid);
+		}
+	}
+	release(&ptable.lock);
+	return 22;
+}
+
+//change current user
+int
+changeUser(char* targetUser)
+{
+	struct proc *p;
+	acquire(&ptable.lock);
+	//cprintf("name \t pid \t state \t \n");
+	for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+	{
+		safestrcpy(p->currentUser, targetUser, strlen(targetUser) + 1);
+	}
+	release(&ptable.lock);
+	//cprintf("current user: %s", targetUser);
+	/*currentUser = "Admin";
+	int fd = open("UserList", O_RDONLY);
+
+
+
+	char buf[1024];
+	read(fd, buf, sizeof buf);
+	char nameList[128];
+	int i = 0; // buffer iterator
+	int n = 0; // name iterator
+	char c;
+	do
+	{
+		c=buf[i];		
+		i++;	
+		if(c==';')
+		{
+			// compare string
+			if(strncmp(targetUser,nameList,n) == 0)
+			{
+				currentUser = targetUser;
+				close(fd);
+				return 24;
+			}			
+			n=0;
+		}
+		else
+		{
+			nameList[n]=c;
+			n++;
+		}		
+		
+	}while(c!=0);
+	close(fd);	
+	
+	cprintf("User not found!!\n");*/
+	//int n = strlen(targetUser);
+	//safestrcpy(currentUser,targetUser,n + 1);
+	//char* i = targetUser;
+	//while(
+	//currentUser = targetUser;	
+	//cprintf("currentUser: %s\n", currentUser);
+	return 24;
+}
+
+int
+getUser(void)
+{
+	struct proc *p;
+	acquire(&ptable.lock);
+	//cprintf("name \t pid \t state \t \n");
+	p = ptable.proc;
+	cprintf("%s", p->currentUser);
+	release(&ptable.lock);
+	return 25;
+}
+

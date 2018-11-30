@@ -8,4 +8,6 @@ struct stat {
   uint ino;    // Inode number
   short nlink; // Number of links to file
   uint size;   // Size of file in bytes
+  char owner[96];  // Belong to which user
+  char group[96];
 };

@@ -89,3 +89,23 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_cps(void)
+{
+	return cps();
+}
+
+int 
+sys_changeUser(void)
+{
+	char* userName;
+	argstr(0, &userName);
+	return changeUser(userName);
+}
+int
+sys_getUser(void)
+{
+	//cprint("%s\n",getUser());
+	return getUser();
+}
