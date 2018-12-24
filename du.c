@@ -63,13 +63,25 @@ int main(int argc, char *argv[])
 							}	
 		
 						}
-						i--;
 						int k = i;
+						// delete ':'
 						while (buf[k] != '\0')
 						{
 							buf[k] = buf[k+1];
 							k++;
 						}
+						while (buf[i] != ':')	
+						{
+							int k = i;
+							while (buf[k] != '\0')
+							{
+								buf[k] = buf[k+1];
+								k++;
+							}	
+		
+						}
+						i--;
+						// delete ':'
 						k = i;
 						while (buf[k] != '\0')
 						{

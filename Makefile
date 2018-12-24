@@ -190,10 +190,14 @@ UPROGS=\
 	_fe\
 	_ef\
 	_af\
+	_rd\
+	_wr\
+	_enc\
+	_dec\
 	_zombie\
 
-fs.img: mkfs README Filechanged UserList FileAppendix demoRDWR $(UPROGS)
-	./mkfs fs.img README Filechanged UserList FileAppendix demoRDWR $(UPROGS)
+fs.img: mkfs README Filechanged UserList FileAppendix demoRDWR AllStar $(UPROGS)
+	./mkfs fs.img README Filechanged UserList FileAppendix demoRDWR AllStar $(UPROGS)
 
 -include *.d
 
@@ -206,7 +210,7 @@ clean:
 
 # make a printout
 FILES = $(shell grep -v '^\#' runoff.list)
-PRINT = runoff.list runoff.spec README Filechanged UserList FileAppendix demoRDWR toc.hdr toc.ftr $(FILES)
+PRINT = runoff.list runoff.spec README Filechanged AllStar UserList FileAppendix demoRDWR toc.hdr toc.ftr $(FILES)
 
 xv6.pdf: $(PRINT)
 	./runoff
@@ -259,7 +263,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 
 EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
-	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c ps.c cu.c au.c lu.c du.c fe.c co.c ef.c af.c zombie.c\
+	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c ps.c cu.c au.c lu.c du.c fe.c co.c ef.c af.c rd.c wr.c enc.c dec.c zombie.c\
 	printf.c umalloc.c\
 	.gdbinit.tmpl gdbutil\
 

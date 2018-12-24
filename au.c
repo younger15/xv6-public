@@ -29,9 +29,17 @@ int main(int argc, char *argv[])
 			if (buf[i-1] == '\n')
 				i--;
 			int j = 0;
+			int k = 0;
 			for(j = 0; j < strlen(argv[1]); j++)
 			{
 				buf[i] = argv[1][j];
+				i++;
+			}
+			buf[i]=':';
+			i++;
+			for(k = 0; k < strlen(argv[2]); k++)
+			{
+				buf[i] = argv[2][k];
 				i++;
 			}
 			buf[i]=':';

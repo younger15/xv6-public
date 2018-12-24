@@ -21,6 +21,7 @@ main(void)
 
   for(;;){
     printf(1, "init: starting sh\n");
+    //exec("cu");
     pid = fork();
     if(pid < 0){
       printf(1, "init: fork failed\n");
