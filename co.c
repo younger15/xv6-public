@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 					i++;
 					buf[i] = '\0';
 				}
-				printf(1,"buf: %s\n",buf);
+				//printf(1,"buf: %s\n",buf);
 				fd = open("FileAppendix", O_RDWR);
 				if(fd >= 0)
 				{

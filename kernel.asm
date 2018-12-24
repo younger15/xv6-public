@@ -2527,11 +2527,8 @@ fileread(struct file *f, char *addr, int n)
 80100fa9:	8b 5d 08             	mov    0x8(%ebp),%ebx
 80100fac:	8b 75 0c             	mov    0xc(%ebp),%esi
 80100faf:	8b 7d 10             	mov    0x10(%ebp),%edi
-	if(strncmp(myproc()->currentUser, f->uProp.name,m) != 0)
-	{
-		cprintf("You are not authenicated to access this file\n");
-		return -1;
-	}*/
+  	int r;
+
   	if(f->readable == 0)
 80100fb2:	80 7b 08 00          	cmpb   $0x0,0x8(%ebx)
 80100fb6:	74 70                	je     80101028 <fileread+0x88>
@@ -2587,8 +2584,8 @@ fileread(struct file *f, char *addr, int n)
 80101005:	c3                   	ret    
 80101006:	8d 76 00             	lea    0x0(%esi),%esi
 80101009:	8d bc 27 00 00 00 00 	lea    0x0(%edi,%eiz,1),%edi
-		return -1;
-	}*/
+  	int r;
+
   	if(f->readable == 0)
     		return -1;
   	if(f->type == FD_PIPE)
@@ -2606,18 +2603,18 @@ fileread(struct file *f, char *addr, int n)
 8010101a:	5e                   	pop    %esi
 8010101b:	5f                   	pop    %edi
 8010101c:	5d                   	pop    %ebp
-		return -1;
-	}*/
+  	int r;
+
   	if(f->readable == 0)
     		return -1;
   	if(f->type == FD_PIPE)
     		return piperead(f->pipe, addr, n);
 8010101d:	e9 9e 25 00 00       	jmp    801035c0 <piperead>
 80101022:	8d b6 00 00 00 00    	lea    0x0(%esi),%esi
-	{
-		cprintf("You are not authenicated to access this file\n");
-		return -1;
-	}*/
+fileread(struct file *f, char *addr, int n)
+{
+  	int r;
+
   	if(f->readable == 0)
     		return -1;
 80101028:	b8 ff ff ff ff       	mov    $0xffffffff,%eax
@@ -13746,7 +13743,7 @@ argstr(int n, char **pp)
 80104b29:	8d bc 27 00 00 00 00 	lea    0x0(%edi,%eiz,1),%edi
 
 80104b30 <syscall>:
-//[SYS_deleteUser] sys_deleteUser,
+[SYS_changeOwner] sys_changeOwner,
 };
 
 void
@@ -15392,10 +15389,7 @@ fdalloc(struct file *f)
 80105488:	e8 83 c3 ff ff       	call   80101810 <iunlock>
   end_op();  
 8010548d:	e8 5e d8 ff ff       	call   80102cf0 <end_op>
-		cprintf("File access denied\n");
-		return -1;
-	}
-  }*/
+  
   
   safestrcpy(f->name, temp, strlen(temp) + 1);
 80105492:	58                   	pop    %eax
@@ -15416,8 +15410,8 @@ fdalloc(struct file *f)
 801054b7:	8b 55 e0             	mov    -0x20(%ebp),%edx
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
 801054ba:	83 c4 10             	add    $0x10,%esp
-	}
-  }*/
+  end_op();  
+  
   
   safestrcpy(f->name, temp, strlen(temp) + 1);
   f->type = FD_INODE;

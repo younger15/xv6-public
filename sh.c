@@ -49,6 +49,7 @@ struct backcmd {
   struct cmd *cmd;
 };
 
+int cu(int argc, char *argv1, char* argv2);
 int fork1(void);  // Fork but panics on failure.
 void panic(char*);
 struct cmd *parsecmd(char*);
@@ -155,6 +156,40 @@ main(void)
       break;
     }
   }
+
+  // Login process
+  static int isLogin = 0;
+  if (isLogin == 0)
+  {  
+     	char name[64];
+	char password[64];
+	do
+ 	{
+		printf(1,"Please enter your user name & password.\n");
+		printf(1,"User name: ");
+		gets(name,sizeof(name));
+		printf(1,"Password: ");
+		gets(password,sizeof(password));
+	} while (cu(3,name,password) != 1);
+	isLogin = 1;
+  }
+  
+
+  // Read and run input commands. (original)
+/*
+  while(getcmd(buf, sizeof(buf)) >= 0){
+    if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
+      // Chdir must be called by the parent, not the child.
+      buf[strlen(buf)-1] = 0;  // chop \n
+      if(chdir(buf+3) < 0)
+        printf(2, "cannot cd %s\n", buf+3);
+      continue;
+    }
+    if(fork1() == 0)
+      runcmd(parsecmd(buf));
+    wait();
+  }
+*/
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
@@ -491,4 +526,122 @@ nulterminate(struct cmd *cmd)
     break;
   }
   return cmd;
+}
+
+int cu(int argc, char* argv1, char* argv2)
+{	
+	int loginSuccess = 0;
+	int fd = open("UserList", O_RDONLY);
+	char *targetUser = argv1;
+	char nameList[128];
+	char buf[512];
+	int checkReadFile = read(fd, buf,sizeof buf);
+	if(checkReadFile < 0)
+	{
+		printf(1,"Can't find user list\n");
+	}
+	else
+	{
+		int i = 0; // buffer iterator
+		int n = 0; // name iterator
+		char c;
+		do
+		{
+			c=buf[i];		
+			i++;
+			
+			if(c==':')
+			{
+				// compare string
+				//printf(1, "names: %s\n", names);
+				char* j = targetUser;
+				char* k = nameList;
+				while(n > 0 && *j && *j == *k)
+				{
+					//printf(1,"n=%d\n",n);
+					n--;
+					j++;
+					k++;
+  				}
+				
+				if(n == 0)
+    				{
+					//printf(1, "name found\n");
+					// add password verification here
+					char password[128];
+					int p = 0; // password iterator
+					do
+					{
+						c = buf[i];
+						i++;
+
+						if (c == ':')
+						{
+							// compare password string
+							j = argv2;
+							k = password;
+							while (p > 0 && *j && *j == *k)
+							{
+								p--;
+								j++;
+								k++;
+							} 
+							if (p == 0)
+							{
+								if (argv1[strlen(argv1)-1] == '\n')
+								{
+									argv1[strlen(argv1)-1] = '\0';
+								}
+								changeUser(argv1);
+								printf(1,"User changed.\n");
+								loginSuccess = 1;
+							}
+							else
+							{
+								printf(1,"Incorrect password. Please try again.\n");
+								
+							}
+							break;
+						}
+						else
+						{
+							password[p] = c;
+							p++;
+						}
+
+					} while (c != ':');
+								
+					break;
+				}
+				else
+				{
+					// skip the password part
+					do
+					{
+						c = buf[i];
+						i++;
+					} while (c != ':');
+				}
+				n = 0;
+			}
+			else
+			{
+				//printf(1,"n: %d\n",n);
+				nameList[n]=c;
+				n++;
+			}
+			
+		
+		}while(c != '\0');
+		if(c == '\0')
+		{
+			printf(1,"User not found\n");
+		}
+	}
+	
+	close(fd);
+
+
+		
+	return loginSuccess;
 }

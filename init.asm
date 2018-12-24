@@ -47,16 +47,17 @@ main(void)
   4b:	68 c8 07 00 00       	push   $0x7c8
   50:	6a 01                	push   $0x1
   52:	e8 49 04 00 00       	call   4a0 <printf>
+    //exec("cu");
     pid = fork();
   57:	e8 ce 02 00 00       	call   32a <fork>
     if(pid < 0){
   5c:	83 c4 10             	add    $0x10,%esp
   5f:	85 c0                	test   %eax,%eax
-  dup(0);  // stdout
   dup(0);  // stderr
 
   for(;;){
     printf(1, "init: starting sh\n");
+    //exec("cu");
     pid = fork();
   61:	89 c3                	mov    %eax,%ebx
     if(pid < 0){
@@ -85,9 +86,9 @@ main(void)
   87:	e8 14 04 00 00       	call   4a0 <printf>
   8c:	83 c4 10             	add    $0x10,%esp
   8f:	eb df                	jmp    70 <main+0x70>
-
   for(;;){
     printf(1, "init: starting sh\n");
+    //exec("cu");
     pid = fork();
     if(pid < 0){
       printf(1, "init: fork failed\n");
